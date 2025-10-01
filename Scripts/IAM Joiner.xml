@@ -1,0 +1,40 @@
+// Get the context for interacting with the IdentityIQ API
+//imports must be defined!
+SailPointContext context = getContext();
+
+try {
+    // Get all applications
+    itApps = context.getObjects(Application.class, null, null);
+    
+    while (itApps.hasNext()) {
+        app = (Application) itApps.next();
+
+        attrs = new Attributes<String, Object>();
+        attrs.put("jobTitle", "temp");
+
+        // Search for identity with jobTitle equals to "temp" in the application
+        identity = findIdentity(context, app, attrs);
+
+        if (identity != null) {
+            if ("true".equalsIgnoreCase(identity.getAttributeValue("inactive"))) {
+                // If inactive IS true, trigger a joiner for a new hire process.
+                createJoiner(context, identity);
+            } else {
+                // If NOT inactive, activate the identity
+                activateIdentity(context, identity);
+
+                // Update the jobTitle to fullTime in the current identity cube where the employeeNumber matches the identity found.
+                IdentityCube cube = findIdentityCube(context, identity.getAttributeValue("employeeNumber"));
+                if (cube != null) {
+                    cube.updateAttribute("jobTitle", "fullTime");
+                    context.saveObject(cube);
+                    context.commitTransaction();
+                }
+            }
+        }
+    }
+} catch (GeneralException ge) {
+    System.err.println("Error occurred: " + ge.getMessage());
+} finally {
+    context.close();
+}
